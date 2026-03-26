@@ -157,11 +157,12 @@ State state_create(String midi_file) {
 	return state;
 }
 
+//Επιστρέφει τις βασικές πληροφορίες του παιχνιδιού στην κατάσταση state
 StateInfo state_info(State state) {
-	// Προς υλοποίηση
-	return NULL;
+	return &state->info; //Επιστρέφει τη διεύθηνση μνήμης του πεδίου info 
 }
 
+//Επιστρέφει το channel που πρέπει να χρησιμοποιείται για live playing
 int state_playing_channel(State state) {
 	// Το state->recording_index ξεκινάει από το 0 και δείχνει πάντα είτε στο
 	// clip που ηχογραφείται τώρα, είτε (αν δεν υπάρχει ενεργή ηχογράφηση) στο
@@ -171,18 +172,19 @@ int state_playing_channel(State state) {
 	// Το κανάλι στο οποίο παίζει "live" ο χρήστης είναι το κανάλι του clip στο
 	// οποίο δείχνει το recording_index.
 
-	// Προς υλοποίηση
-	return 0;
+	Clip c = vector_get_at(state->clips, state->recording_index); //Βρίσκουμε σε ποιο clip βρισκόμαστε τώρα
+	return c->channel;
 }
 
+//Επιστρέφει τη διάρκεια ενός μέτρου του τραγουδιού (σε δευτερόλεπτα)
 double state_measure_duration(State state) {
 	MidiFile midi = state->midi_file;
 	return midi->time_signature[0] * (60.0 / midi->tempo) * (4.0 / midi->time_signature[1]);
 }
 
+//Επιστρέφει τη συνολική διάρκεια (σε δευτερόλεπτα) του τραγουδιού
 double state_total_duration(State state) {
-	// Προς υλοποίηση
-	return 0.0;
+	return state->midi_file->duration;
 }
 
 List state_displayed_notes(State state, double time_window) {
