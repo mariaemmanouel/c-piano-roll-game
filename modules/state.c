@@ -177,6 +177,7 @@ int state_playing_channel(State state) {
 }
 
 //Επιστρέφει τη διάρκεια ενός μέτρου του τραγουδιού (σε δευτερόλεπτα)
+//Θεωρούμε ότι η διάρκεια είναι σταθερή σε όλο το τραγούδι
 double state_measure_duration(State state) {
 	MidiFile midi = state->midi_file;
 	return midi->time_signature[0] * (60.0 / midi->tempo) * (4.0 / midi->time_signature[1]);
@@ -187,14 +188,36 @@ double state_total_duration(State state) {
 	return state->midi_file->duration;
 }
 
+//Επιστρέφει μια λίστα με νότες που εμφανίζονται για να παίξει ο χρήστης
+//από την τρέχουσα χρονική στιγμή μέχρι και time_window στο μέλλον
+//Η λίστα είναι ταξινομημένη σε αύξουσα σειρά ως προς event->time
 List state_displayed_notes(State state, double time_window) {
-	// Προς υλοποίηση
-	return NULL;
+	List notes = list_create(NULL); //Φτιάχνουμε μια νέα κενή λίστα
+	for (ListNode node = list_first(state->midi_file->events); node != LIST_EOF; node = list_next(state->midi_file->events, node)){ //Ελέγχουμε όλα τα events του τραγουδιού
+		MidiEvent value = list_node_value(state->midi_file->events, node); 
+		//Ελέγχουμε αν το event ικανοποιεί τις 3 προυποθέσεις
+		if (value->type == MIDI_NOTE && value->channel == state_playing_channel(state) && value->time >= state->info.time && value->time <= state->info.time + time_window){ 
+			list_insert_next(notes, list_last(notes), value); //Βάζουμε τη νότα στο τέλος της νέας λίστας
+		}
+	}
+
+	return notes;
 }
 
+//Επιστρέφει μια λίστα με MIDI events προς αναπαραγωγή από "since"
+//δευτερόλεπτα στο παρελθόν μέχρι και την τρέχουσα χρονική στιγμή
+//Η λίστα επιστρέφεται ταξινομημένη σε μη-φθίνουσα σειρά ως προς event->time
 List state_playback_events(State state, double since) {
-	// Προς υλοποίηση
-	return NULL;
+	List events = list_create(NULL); //Φτιάχνουμε μια νέα κενή λίστα
+	for (ListNode node = list_first(state->midi_file->events); node != LIST_EOF; node = list_next(state->midi_file->events, node)){ //Ελέγχουμε όλο το τραγούδι
+		MidiEvent value = list_node_value(state->midi_file->events, node);
+		//Ελέγχουμε αν ικανοποιεί και τις 3 προυποθέσεις
+		if (!(value->type == MIDI_NOTE && value->channel == state_playing_channel(state)) && value->time >= state->info.time - since && value->time <= state->info.time){
+			list_insert_next(events, list_last(events), value); //Βάζουμε το event στη λίστα για να ακουστεί
+		}
+	}
+
+	return events;
 }
 
 void state_update(State state, KeyState ks, double elapsed_time) {

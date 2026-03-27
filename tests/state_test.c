@@ -68,6 +68,12 @@ void test_state_update() {
 	state_destroy(state);
 }
 
+void test_state_lists(){
+	State state = state_create("test.mid");
+	TEST_ASSERT(state != NULL);
+
+	
+}
 
 // Λίστα με όλα τα tests προς εκτέλεση
 TEST_LIST = {
