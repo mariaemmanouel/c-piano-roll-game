@@ -71,8 +71,34 @@ void test_state_update() {
 void test_state_lists(){
 	State state = state_create("test.mid");
 	TEST_ASSERT(state != NULL);
+    
+	//Έλεγχος 1: state_displayed_notes
 
-	
+	//Καλούμε τη συνάρτηση για ένα μικρό παράθυρο και ένα μεγαλύτερο
+    List notes1 = state_displayed_notes(state, 1.5);
+	List notes2 = state_displayed_notes(state, 5.0);
+    
+	//Ελέγχουμε αν το μικρό παράθυρο έχει λιγότερες ή ίσες νότες από το μεγαλύτερο
+	TEST_ASSERT(list_size(notes1) <= list_size(notes2));
+    
+	//Ελευθερώνουμε τη μνήμη
+    list_destroy(notes1);
+	list_destroy(notes2);
+    
+    //Έλεγχος 2: state_playback_events
+
+	//Καλούμε τη συνάρτηση για ένα μικρό παρελθόν και ένα μεγαλύτερο
+    List events1 = state_playback_events(state, 1.5);
+	List events2 = state_playback_events(state, 3.5);
+
+	//Ελέγχουμε αν το μικρό παρελθόν έχει λιγότερους ή ίσους backround ήχους από το μεγαλύτερο
+	TEST_ASSERT(list_size(events1) <= list_size(events2));
+
+	//Ελευθερώνουμε τη μνήμη
+	list_destroy(events1);
+	list_destroy(events2);
+
+	state_destroy(state);
 }
 
 // Λίστα με όλα τα tests προς εκτέλεση
@@ -80,6 +106,7 @@ TEST_LIST = {
 	{ "test_state_create", test_state_create },
 	{ "test_state_basic_functions", test_state_basic_functions },
 	{ "test_state_update", test_state_update },
+	{ "test_state_lists", test_state_lists },
 
 	{ NULL, NULL } // τερματίζουμε τη λίστα με NULL
 };
