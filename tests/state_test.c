@@ -58,12 +58,42 @@ void test_state_update() {
 	State state = state_create("test.mid");
 	TEST_ASSERT(state != NULL);
 
-	// Παράδειγμα:
 	struct key_state ks = empty_key_state();
+	
 	ks.space = true;
-
 	state_update(state, &ks, 0.0);
-	// TEST_ASSERT(!state_info(state)->paused);
+	TEST_ASSERT(!state_info(state)->paused);
+
+    ks.space = false;
+	state_update(state, &ks, 0.7);
+	TEST_ASSERT(double_equal(state_info(state)->time, 0.7));
+
+	ks.space = true;
+	state_update(state, &ks, 0.2);
+	TEST_ASSERT(state_info(state)->paused);
+	TEST_ASSERT(double_equal(state_info(state)->time, 0.7));
+
+	ks.space = false;
+	state_update(state, &ks, 0.5);
+	TEST_ASSERT(state_info(state)->paused);
+	TEST_ASSERT(double_equal(state_info(state)->time, 0.7));
+
+	ks.n = true;
+	state_update(state, &ks, 0.1);
+	TEST_ASSERT(double_equal(state_info(state)->time, 0.8));
+
+	ks.n = false;
+	ks.space = true;
+	state_update(state, &ks, 0.0);
+	ks.space = false;
+
+    Clip clip = vector_get_at(state->clips, state_info(state)->recording_index);
+	ks.changed_keys[42] = 100;
+	state_update(state, &ks, 0.1);
+	ks.changed_keys[42] = -1;
+	MidiEvent event = list_node_value(clip->recorded, list_first(clip->recorded));
+	TEST_ASSERT(list_size(clip->recorded) == 1);
+	TEST_ASSERT(event->key == 42 && event->velocity == 100);
 
 	state_destroy(state);
 }
