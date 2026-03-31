@@ -220,8 +220,105 @@ List state_playback_events(State state, double since) {
 	return events;
 }
 
+//Ενημερώνει την κατάσταση state του παιχνιδιού μετά την πάροδο elapsed_time
+//χρόνου, και με βάση την κατάσταση πλήκτρων ks
 void state_update(State state, KeyState ks, double elapsed_time) {
-	// Προς υλοποίηση
+	//PAUSE/RESUME
+
+	//Αν πατηθεί space και βρίσκεται σε game over, γίνεται reset το παιχνίδι
+	if (ks->space && state->info.game_over){
+		state->info.game_over = false;
+		state->info.paused = false;
+	}
+	//Αν πατηθεί space κατά τη διάρκεια του παιχνιδιού, αλλάζουμε την κατάσταση pause
+	else if (ks->space && !state->info.game_over){
+		if (state->info.paused == true){
+			state->info.paused = false;
+		}
+		else{
+			state->info.paused = true;
+		}    
+	}
+
+	//ΧΡΟΝΟΣ - FRAME STEP
+
+	//Ο χρόνος αυξάνεται αν το παιχνίδι δεν είναι ούτε σε pause ούτε σε game over
+	//ή αν είναι σε pause και πατήθει το 'n' 
+	if ((!state->info.paused && !state->info.game_over) || (state->info.paused && ks->n)){
+		state->info.time += elapsed_time;
+	}
+	//Αλλιώς βγαίνουμε από τη συνάρτηση
+	else{
+		return;
+	}
+
+    //ΗΧΟΓΡΑΦΗΣΗ
+
+	//Ελέγχουμε αν υπάρχει clip προς ηχογράφηση
+	if (state->recording_index < vector_size(state->clips)){
+		Clip clip = vector_get_at(state->clips, state->recording_index);
+        
+		//Διατρέχουμε όλα τα πλήκτρα
+		for (int i = 0; i < 128; i++){
+			if (ks->changed_keys[i] >= 0){ //Ελέγχουμε τι πατήθηκε/αφέθηκε τώρα
+                //Εισάγουμε στη λίστα clip->recorded τα νέα events
+				MidiEvent new_event1 = malloc(sizeof(struct midi_event));
+				new_event1->time = state->info.time - clip->start; //Τρέχων Χρόνος Παιχνιδιού - Χρόνος Έναρξης Clip
+                new_event1->channel = clip->channel;
+				new_event1->type = MIDI_NOTE;
+				new_event1->key = i;
+				new_event1->velocity = ks->changed_keys[i];
+				list_insert_next(clip->recorded, list_last(clip->recorded), new_event1);
+			}
+		}
+        
+		//ΤΕΛΟΣ ΗΧΟΓΡΑΦΗΣΗΣ
+
+		//Ελέγχουμε αν ο συνολικός χρόνος ξεπέρασε το χρονικό όριο του τρέχων clip
+		if (state->info.time >= (clip->start + clip->duration)){
+			//Διατρέχουμε όλες τις νότες
+			for (int i = 0; i < 128; i++){
+				//Ελέγχουμε ποιές νότες είναι πατημένες
+				if (ks->active_keys[i] > 0){
+					//Εισάγουμε στη λίστα clip->recorded το note off event
+					MidiEvent note_off_event = malloc(sizeof(struct midi_event));
+					note_off_event->time = clip->duration; //Το χρονικό όριο
+					note_off_event->channel = clip->channel;
+					note_off_event->type = MIDI_NOTE;
+					note_off_event->key = i;
+					note_off_event->velocity = 0; //0 : μη πατημένο
+					list_insert_next(clip->recorded, list_last(clip->recorded), note_off_event);
+				}
+			}
+
+			//LOOP
+
+			//Διατρέχουμε όλα τα σημεία που πρέπει να παίξει το clip
+            for (ListNode node1 = list_first(clip->plays); node1 != LIST_EOF; node1 = list_next(clip->plays, node1)){
+				ClipPlay clip_play = list_node_value(clip->plays, node1);
+				double duration_counter = 0;
+				//Όσο ο μετρητής δεν έχει γεμίσει τη συνολική διάρκεια του play segment
+				while (duration_counter < clip_play->duration){
+					//Διατρέχουμε όλες τις ηχογραφημένες νότες
+					for (ListNode node2 = list_first(clip->recorded); node2 != LIST_EOF; node2 = list_next(clip->recorded, node2)){
+                        //Τις αντιγράφουμε και τις εισάγουμε στη λίστα state->midi_events
+						MidiEvent event = list_node_value(clip->recorded, node2);
+						MidiEvent new_event2 = malloc(sizeof(struct midi_event));
+						new_event2->time = clip_play->start + duration_counter + event->time; //Έναρξη Segment + Χρόνος Προηγούμενων Λουπών + Χρόνος Νότας
+						new_event2->channel = event->channel;
+						new_event2->type = event->type;
+						new_event2->key = event->key;
+						new_event2->velocity = event->velocity;
+						list_insert_next(state->midi_events, list_last(state->midi_events), new_event2);
+					}
+					duration_counter += clip->duration; //Προσθέτουμε τον χρόνο μιας ολόκληρης λούπας στον μετρητή
+				}
+			}
+            //Πηγαίνουμε στο επόμενο clip
+			state->recording_index++;
+		}
+	}
+	
 }
 
 void state_destroy(State state) {
