@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "ADTList.h"
 #include "ADTVector.h"
@@ -291,6 +292,98 @@ void state_update(State state, KeyState ks, double elapsed_time) {
 				}
 			}
 
+			//Λίστα με μόνο τις σωστές απαντήσεις για το συγκεκριμένο clip
+			List clip_song = list_create(NULL);
+			//Μετρητής πατήματος νότας στο συγκεκριμένο clip
+			int song_note_on_count = 0;
+			//Διατρέχουμε όλα τα events από το αρχικό τραγούδι
+			for (ListNode node1 = list_first(state->midi_file->events); node1 != LIST_EOF; node1 = list_next(state->midi_file->events, node1)){
+				MidiEvent event1 = list_node_value(state->midi_file->events, node1);
+				//Ελέγχουμε αν ικανοποιεί όλες τις προυποθέσεις για την λίστα clip_song
+				if (event1->type == MIDI_NOTE && event1->channel == clip->channel && event1->time >= clip->start && event1->time <= (clip->start + clip->duration)){
+					//Το εισάγουμε στη λίστα
+					list_insert_next(clip_song, list_last(clip_song), event1);
+					//Αν πατήθηκε
+					if (event1->velocity > 0){
+						song_note_on_count++;
+					}
+				}
+			}
+			//Μετρητής πατήματος που έκανε ο παίκτης
+			int played_note_on_count = 0;
+			//Συνολικός βαθμός
+			double score = 0.0;
+			//Διατρέχουμε όλα τα events της ηχογράφησης
+			for (ListNode node2 = list_first(clip->recorded); node2 != LIST_EOF; node2 = list_next(clip->recorded, node2)){
+				MidiEvent event2 = list_node_value(clip->recorded, node2);
+				//Αν πατήθηκε
+				if (event2->velocity > 0){
+					played_note_on_count++;
+					//Διατρέχουμε τη λίστα με τις σωστές απαντήσεις
+					for (ListNode node3 = list_first(clip_song); node3 != LIST_EOF; node3 = list_next(clip_song, node3)){
+                        MidiEvent event3 = list_node_value(clip_song, node3);
+						//Ελέγχουμε αν ικανοποιεί όλες τις προυποθέσεις του match
+						if (event3->velocity > 0 && event3->key == event2->key && fabs((event2->time + clip->start) - event3->time) <= 0.1){
+                            //README
+							double played_duration = 0.0;
+                            double song_duration = 0.0;
+							//Διατρέχουμε όλα τα events του clip->recorded μετά το match
+							for (ListNode node4 = list_next(clip->recorded, node2); node4 != LIST_EOF; node4 = list_next(clip->recorded, node4)){
+                                MidiEvent event4 = list_node_value(clip->recorded, node4);
+								//Αν είναι το ίδιο πλήκτρο και είναι άφημα
+								if (event4->key == event2->key && event4->velocity == 0){
+									//Βρίσκουμε τη διάρκεια που έπαιξε ο παίκτης
+									played_duration = event4->time - event2->time;
+									break;
+								}
+							}
+							//Διατρέχουμε όλα τα events του clip_song μετά το match
+							for (ListNode node5 = list_next(clip_song, node3); node5 != LIST_EOF; node5 = list_next(clip_song, node5)){
+								MidiEvent event5 = list_node_value(clip_song, node5);
+								//Αν είναι το ίδιο πλήκτρο και είναι άφημα
+								if (event5->key == event3->key && event5->velocity == 0){
+									//Βρίσκουμε τη διάρκεια του τραγουδιού
+									song_duration = event5->time - event3->time;
+									break;
+								}
+							}
+							//Χρονισμός: η διαφορά μεταξύ του πότε πάτησε τη νότα με του πότε έπρεπε να την πατήσει
+							double time_diff = fabs((event2->time + clip->start) - event3->time);
+							//Κράτημα: η διαφορά μεταξύ του πόσο κράτησε τη νότα πατημένη με το πόσο έπρεπε να την κρατήσει πατημένη
+							double duration_diff = fabs(played_duration - song_duration);
+							//Ο κανόνας των drums
+							if (clip->channel == 9){
+								duration_diff = 0.0;
+							}
+							//Υπολογίζουμε το συνολικό λάθος και το συνολικό σκορ
+							double diff = time_diff + duration_diff;
+							score += exp(-((diff/0.1) * (diff/0.1)));
+                            //auto-correct: χρόνο σωστής νότας
+							event2->time = event3->time - clip->start;
+							//Σβήσιμο νότας που έκανε match
+							list_remove(clip_song, node3);
+							break; //βρήκε match
+						}
+					}
+				}
+			}
+			//comments
+			int max;
+			if (song_note_on_count > played_note_on_count){
+				max = song_note_on_count;
+			}
+			else{
+				max = played_note_on_count;
+			}
+			if (max == 0){
+				max = 1;
+			}
+			double accuracy = score / max;
+			if (accuracy < clip->accuracy_threshold){
+				state->info.game_over = true;
+				return;
+			}
+			
 			//LOOP
 
 			//Διατρέχουμε όλα τα σημεία που πρέπει να παίξει το clip
@@ -314,7 +407,7 @@ void state_update(State state, KeyState ks, double elapsed_time) {
 					duration_counter += clip->duration; //Προσθέτουμε τον χρόνο μιας ολόκληρης λούπας στον μετρητή
 				}
 			}
-            //Πηγαίνουμε στο επόμενο clip
+			//Πηγαίνουμε στο επόμενο clip
 			state->recording_index++;
 		}
 	}
