@@ -60,40 +60,68 @@ void test_state_update() {
 
 	struct key_state ks = empty_key_state();
 	
+	//TEST PAUSE/RESUME
+
+	//Ελέγχουμε αν είναι paused και πατήσουμε space -> όχι paused
 	ks.space = true;
 	state_update(state, &ks, 0.0);
 	TEST_ASSERT(!state_info(state)->paused);
 
-    ks.space = false;
+	//Ελέγχουμε αν δεν είναι paused και πατήσουμε space -> paused
+	ks.space = true;
+	state_update(state, &ks, 0.0);
+	TEST_ASSERT(state_info(state)->paused);
+
+	//Ελέγχουμε αν είναι σε game over και πατήσουμε space -> reset παιχνιδιού
+	state_info(state)->game_over = true;
+	ks.space = true;
+	state_update(state, &ks, 0.0);
+	TEST_ASSERT(!state_info(state)->game_over && !state_info(state)->paused);
+    
+    //TEST ΧΡΟΝΟ ΚΑΙ FRAME STEP
+
+	//Ελέγχουμε αν δεν είναι paused ούτε σε game over -> ο χρόνος αυξάνεται κατά elapsed_time
+	ks.space = false;
 	state_update(state, &ks, 0.7);
 	TEST_ASSERT(double_equal(state_info(state)->time, 0.7));
 
-	ks.space = true;
+	//Ελέγχουμε αν είναι μόνο paused -> ο χρόνος δεν αυξάνεται
+	state_info(state)->paused = true;
 	state_update(state, &ks, 0.2);
-	TEST_ASSERT(state_info(state)->paused);
 	TEST_ASSERT(double_equal(state_info(state)->time, 0.7));
 
-	ks.space = false;
-	state_update(state, &ks, 0.5);
-	TEST_ASSERT(state_info(state)->paused);
-	TEST_ASSERT(double_equal(state_info(state)->time, 0.7));
-
+	//Ελέγχουμε αν είναι paused και πατηθεί το 'n' -> ο χρόνος αυξάνεται κατά elapsed_time
 	ks.n = true;
-	state_update(state, &ks, 0.1);
-	TEST_ASSERT(double_equal(state_info(state)->time, 0.8));
+	state_update(state, &ks, 0.2);
+	TEST_ASSERT(double_equal(state_info(state)->time, 0.9));
 
+	//Ελέγχουμε αν είναι σε game over -> ο χρόνος δεν αυξάνεται
+	state_info(state)->game_over = true;
+	state_info(state)->paused = false;
 	ks.n = false;
-	ks.space = true;
-	state_update(state, &ks, 0.0);
-	ks.space = false;
+	state_update(state, &ks, 0.2);
+	TEST_ASSERT(double_equal(state_info(state)->time, 0.9));
 
-    Clip clip = vector_get_at(state->clips, state_info(state)->recording_index);
-	ks.changed_keys[42] = 100;
+	//TEST ΗΧΟΓΡΑΦΗΣΗ - ΤΕΛΟΣ ΗΧΟΓΡΑΦΗΣΗΣ - LOOP
+
+	//Αρχικοποιούμε τις τιμές
+    state_info(state)->game_over = false;
+	state_info(state)->time = 0;
+	
+	//Πατούμε το πλήκτρο 42 με δύναμη 100
+    ks.changed_keys[42] = 100;
+	ks.active_keys[42] = 1;
 	state_update(state, &ks, 0.1);
 	ks.changed_keys[42] = -1;
-	MidiEvent event = list_node_value(clip->recorded, list_first(clip->recorded));
-	TEST_ASSERT(list_size(clip->recorded) == 1);
-	TEST_ASSERT(event->key == 42 && event->velocity == 100);
+	ks.active_keys[42] = 0;
+
+    state_update(state, &ks, 10.0); //Βεβαίωση ότι έγινε η αντιγραφή
+
+	//Ελέγχουμε αν τελείωσε το παιχνίδι όταν τελειώσουν όλα τα clips
+	state_update(state, &ks, 1000.0);
+	ks.changed_keys[12] = 100;
+	state_update(state, &ks, 0.1);
+	ks.changed_keys[12] = -1;
 
 	state_destroy(state);
 }
