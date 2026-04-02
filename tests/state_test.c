@@ -119,9 +119,14 @@ void test_state_update() {
 
 	//Ελέγχουμε αν τελείωσε το παιχνίδι όταν τελειώσουν όλα τα clips
 	state_update(state, &ks, 1000.0);
-	ks.changed_keys[12] = 100;
-	state_update(state, &ks, 0.1);
-	ks.changed_keys[12] = -1;
+	TEST_ASSERT(state_info(state)->game_over);
+	TEST_ASSERT(double_equal(state_info(state)->accuracy, 0.0));
+
+	//Ελέγχουμε το reset με το space μετά από ήττα
+	ks.space = true;
+	state_update(state, &ks, 0.0);
+	TEST_ASSERT(!state_info(state)->game_over);
+	TEST_ASSERT(state_info(state)->time == 0.0);
 
 	state_destroy(state);
 }

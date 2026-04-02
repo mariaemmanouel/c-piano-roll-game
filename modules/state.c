@@ -230,6 +230,19 @@ void state_update(State state, KeyState ks, double elapsed_time) {
 	if (ks->space && state->info.game_over){
 		state->info.game_over = false;
 		state->info.paused = false;
+
+		state->info.time = 0.0;
+		state->info.accuracy = 0.0;
+		state->info.score = 0;
+		state->info.level = 1; 
+
+		list_destroy(state->midi_events);
+		state->midi_events = list_create(free);
+		for (int i = 0; i < vector_size(state->clips); i++){
+			Clip c = vector_get_at(state->clips, i);
+			list_destroy(c->recorded);
+			c->recorded = list_create(free);
+	    }
 	}
 	//Αν πατηθεί space κατά τη διάρκεια του παιχνιδιού, αλλάζουμε την κατάσταση pause
 	else if (ks->space && !state->info.game_over){
