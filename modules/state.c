@@ -301,10 +301,13 @@ void state_update(State state, KeyState ks, double elapsed_time) {
 				MidiEvent event1 = list_node_value(state->midi_file->events, node1);
 				//Ελέγχουμε αν ικανοποιεί όλες τις προυποθέσεις για την λίστα clip_song
 				if (event1->type == MIDI_NOTE && event1->channel == clip->channel && event1->time >= clip->start && event1->time <= (clip->start + clip->duration)){
+					//Φτιάχνουμε αντίγραφο για ασφάλεια δεδομένων
+					MidiEvent copy_event = malloc(sizeof(struct midi_event));
+					*copy_event = *event1;
 					//Το εισάγουμε στη λίστα
-					list_insert_next(clip_song, list_last(clip_song), event1);
+					list_insert_next(clip_song, list_last(clip_song), copy_event);
 					//Αν πατήθηκε
-					if (event1->velocity > 0){
+					if (copy_event->velocity > 0){
 						song_note_on_count++;
 					}
 				}
@@ -324,7 +327,6 @@ void state_update(State state, KeyState ks, double elapsed_time) {
                         MidiEvent event3 = list_node_value(clip_song, node3);
 						//Ελέγχουμε αν ικανοποιεί όλες τις προυποθέσεις του match
 						if (event3->velocity > 0 && event3->key == event2->key && fabs((event2->time + clip->start) - event3->time) <= 0.1){
-                            //README
 							double played_duration = 0.0;
                             double song_duration = 0.0;
 							//Διατρέχουμε όλα τα events του clip->recorded μετά το match
@@ -361,28 +363,44 @@ void state_update(State state, KeyState ks, double elapsed_time) {
                             //auto-correct: χρόνο σωστής νότας
 							event2->time = event3->time - clip->start;
 							//Σβήσιμο νότας που έκανε match
-							list_remove(clip_song, node3);
+							event3->velocity = -1;
 							break; //βρήκε match
 						}
 					}
 				}
 			}
-			//comments
-			int max;
+			
+			//Διαιρέτης τελικού σκορ
+			int max_notes;
+			//Ελέγχουμε αν οι νότες που έπαιξε είναι λιγότερες από τις νότες του τραγουδιού
 			if (song_note_on_count > played_note_on_count){
-				max = song_note_on_count;
+				max_notes = song_note_on_count;
 			}
+			//Αλλιώς, αν είναι περισσότερες
 			else{
-				max = played_note_on_count;
+				max_notes = played_note_on_count;
 			}
-			if (max == 0){
-				max = 1;
+			//Αν δεν υπάρχουν ούτε έπαιξε νότες
+			if (max_notes == 0){
+				max_notes = 1; //Για αποφυγή σφάλματος
 			}
-			double accuracy = score / max;
-			if (accuracy < clip->accuracy_threshold){
-				state->info.game_over = true;
-				return;
+			
+			//Υπολογίζει και αποθηκεύει το συνολικό σκορ
+			state->info.score += score;
+
+			//Βρίσκουμε τον βαθμό του παίκτη για αυτό το clip
+			double accuracy = score / max_notes;
+			//Αν είναι το πρώτο clip
+			if (state->recording_index == 0){
+				state->info.accuracy = accuracy;
 			}
+			//Αν έχουμε προηγούμενα clips
+			else{
+				state->info.accuracy = (state->info.accuracy * state->recording_index + accuracy) / (state->recording_index + 1);
+			}
+			
+            //Καθαρίζουμε τη μνήμη
+			list_destroy(clip_song);
 			
 			//LOOP
 
@@ -409,6 +427,34 @@ void state_update(State state, KeyState ks, double elapsed_time) {
 			}
 			//Πηγαίνουμε στο επόμενο clip
 			state->recording_index++;
+
+			//Ελέγχουμε αν είμαστε στο τελευταίο clip
+            if (state->recording_index >= vector_size(state->clips)){
+				//Υπολογίζουμε το σκορ που χρειάζεται για να περάσει οποιοδήποτε level
+				double level_score = 0.15 + (0.05 * state->info.level);
+				//Αν πέρασε το level
+				if (state->info.accuracy >= level_score){
+					//Πηγαίνει στο επόμενο level
+					state->info.level++;
+					//Κάνουμε reset του παιχνιδιού
+					state->info.time = 0.0;
+					state->recording_index = 0;
+					state->info.accuracy = 0.0;
+					//Καταστρέφουμε τη λίστα με τα events αυτού του level και δημιουργούμε μια νέα κενή λίστα
+					list_destroy(state->midi_events);
+					state->midi_events = list_create(free);
+					//Το ίδιο και για κάθε clip ξεχωριστά
+					for (int i = 0; i < vector_size(state->clips); i++){
+						Clip c = vector_get_at(state->clips, i);
+						list_destroy(c->recorded);
+						c->recorded = list_create(free);
+					}
+				}
+				//Αν δεν πέρασε το level
+				else{
+					state->info.game_over = true;
+				}
+			}
 		}
 	}
 	
