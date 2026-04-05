@@ -473,6 +473,19 @@ void state_update(State state, KeyState ks, double elapsed_time) {
 	
 }
 
+//Καταστρέφει την κατάσταση state ελευθερώνοντας τη δεσμευμένη μνήμη
 void state_destroy(State state) {
-	// Προς υλοποίηση
+	if (state == NULL){
+		return;
+	}
+
+	//Καταστρέφουμε τη λίστα των events που παίζουν
+	list_destroy(state->midi_events);
+	//Καταστρέφουμε το Vector των clips
+	vector_destroy(state->clips);
+	//Καταστρέφουμε το struct του MIDI αρχείου
+	k08midi_file_destroy(state->midi_file);
+
+	//Ελευθερώνουμε τη μνήμη του παιχνιδιού
+	free(state);
 }
