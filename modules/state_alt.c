@@ -116,7 +116,7 @@ List state_displayed_notes (State state, double time_window){
 //Επιστρέφει μια λίστα με MIDI events προς αναπαραγωγή από "since"
 //δευτερόλεπτα στο παρελθόν μέχρι και την τρέχουσα χρονική στιγμή
 List state_playback_events (State state, double since){
-    //Βρίσκουμε στα σημεία εκκίνησης και για τους δύο Vectors
+    //Βρίσκουμε τα σημεία εκκίνησης και για τους δύο Vectors
     int start1 = find_first_note(state->control_events, state->info.time - since);
     int start2 = find_first_note(state->recorded_events, state->info.time - since);
 
