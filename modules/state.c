@@ -305,6 +305,7 @@ void state_update(State state, KeyState ks, double elapsed_time) {
 				}
 			}
 
+			//(1)
 			//Λίστα με μόνο τις σωστές απαντήσεις για το συγκεκριμένο clip
 			List clip_song = list_create(NULL);
 			//Μετρητής πατήματος νότας στο συγκεκριμένο clip
@@ -325,6 +326,7 @@ void state_update(State state, KeyState ks, double elapsed_time) {
 					}
 				}
 			}
+			//(2)
 			//Μετρητής πατήματος που έκανε ο παίκτης
 			int played_note_on_count = 0;
 			//Συνολικός βαθμός
@@ -383,6 +385,7 @@ void state_update(State state, KeyState ks, double elapsed_time) {
 				}
 			}
 			
+			//(3)
 			//Διαιρέτης τελικού σκορ
 			int max_notes;
 			//Ελέγχουμε αν οι νότες που έπαιξε είναι λιγότερες από τις νότες του τραγουδιού
@@ -441,6 +444,7 @@ void state_update(State state, KeyState ks, double elapsed_time) {
 			//Πηγαίνουμε στο επόμενο clip
 			state->recording_index++;
 
+			//(4)
 			//Ελέγχουμε αν είμαστε στο τελευταίο clip
             if (state->recording_index >= vector_size(state->clips)){
 				//Υπολογίζουμε το σκορ που χρειάζεται για να περάσει οποιοδήποτε level
